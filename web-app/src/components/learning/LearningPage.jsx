@@ -18,7 +18,7 @@ const LearningPage = () => {
     search: ''
   });
 
-  // Sample content data
+  // Sample content data (your existing array)
   const sampleContent = [
     // ACADEMIC COURSES
     { _id: '1', title: "Introduction to Physics - Motion", description: "Learn the basics of motion, velocity, and acceleration. Perfect for 11th grade science students.", category: "academic", grade: "11th", stream: "science", content: { duration: 15 }, difficulty: "beginner", xpReward: 15, progress: null, subject: "Physics" },
@@ -61,176 +61,98 @@ const LearningPage = () => {
     { value: 'competitive', label: '🏆 Competitive' }
   ];
 
-  // ✅ ENHANCED: Crash-proof AI Resource Fetching with Retry Logic
 const fetchAIResources = async (topic) => {
-  const maxRetries = 3;
-  let attempt = 0;
-  
-  while (attempt < maxRetries) {
-    try {
-      attempt++;
-      console.log(`🎯 Attempt ${attempt} - Starting AI resource fetch for:`, topic.title);
-      
-      const requestData = {
-        topic: topic.title,
-        subject: topic.subject || 'General',
-        grade: user?.grade || '11th',
-        stream: user?.stream || 'science',
-        difficulty: topic.difficulty,
-        userId: user?._id
-      };
-
-      console.log('📤 Request data:', requestData);
-
-      // ✅ CORS-Compatible Fetch Configuration
-      const response = await fetch('http://localhost:5000/api/ai/generate-learning-resources', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-          // ❌ DO NOT set Origin header manually - browser sets it
-        },
-        credentials: 'include', // ✅ CRITICAL for CORS with auth
-        body: JSON.stringify(requestData)
-      });
-
-      console.log('📥 Response status:', response.status);
-      console.log('📥 CORS Headers:', {
-        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-        'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Response not OK:', errorText);
-        throw new Error(`Server returned ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Success response received');
-
-      if (data.success && data.resources) {
-        toast.success('🎉 AI resources generated successfully!');
-        return data.resources;
-      } else if (data.fallbackContent) {
-        toast.warn('⚠️ Using fallback content');
-        return data.fallbackContent;
-      } else {
-        throw new Error(data.message || 'No resources received');
-      }
-      
-    } catch (error) {
-      console.error(`❌ Attempt ${attempt} failed:`, error.message);
-      
-      if (attempt >= maxRetries) {
-        const errorMessage = error.message.includes('NetworkError') || error.message.includes('Failed to fetch')
-          ? 'CORS error - server CORS configuration issue'
-          : error.message;
-        throw new Error(errorMessage);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-    }
-  }
-};
-
-
-  // ✅ USER PROGRESS TRACKING FUNCTION
-const trackUserProgress = async (contentData, progressData) => {
   try {
-    if (!user?._id) return;
+    console.log('🎯 Starting AI resource fetch for:', topic.title);
     
-    console.log('📊 Tracking user progress for:', contentData.title);
-    
-    // ✅ FIXED: Added credentials and consistent URL
-    const response = await fetch('http://localhost:5000/api/progress/update', {
+    const requestData = {
+      topic: topic.title,
+      subject: topic.subject || 'General',
+      grade: user?.grade || '11th',
+      stream: user?.stream || 'science',
+      difficulty: topic.difficulty,
+      userLevel: user?.level || 'intermediate'
+    };
+
+    console.log('📤 Request data:', requestData);
+
+    const response = await fetch('http://localhost:5000/api/ai/generate-learning-resources', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+        // ❌ REMOVED: Don't set Origin header manually - browser sets it automatically
       },
-      credentials: 'include', // ✅ CRITICAL FIX!
-      body: JSON.stringify({
-        userId: user._id,
-        contentId: contentData._id || 'ai-content-' + Date.now(),
-        status: progressData.status || 'in_progress',
-        completionPercentage: progressData.completionPercentage || 0,
-        score: progressData.score || 5,
-        timeSpent: progressData.timeSpent || 1,
-        aiResourcesData: progressData.aiResourcesData
-      })
+      credentials: 'include', // ✅ Important for CORS with cookies
+      body: JSON.stringify(requestData)
     });
 
-    if (response.ok) {
-      const result = await response.json(); // ✅ Added response parsing
-      console.log('✅ User progress tracked successfully:', result);
-    } else {
-      console.warn('⚠️ Progress tracking failed:', response.status);
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Response not OK:', errorText);
+      throw new Error(`Server returned ${response.status}: ${errorText}`);
     }
+
+    const data = await response.json();
+    console.log('✅ Success response received');
+    
+    if (data.success && data.resources) {
+      return data.resources;
+    } else {
+      throw new Error(data.message || 'No resources received');
+    }
+    
   } catch (error) {
-    console.error('❌ Failed to track progress (non-critical):', error);
+    console.error('❌ Complete fetchAIResources error:', error);
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error - check if backend server is running on port 5000');
+    }
+    
+    throw error;
   }
 };
 
 
-  // ✅ MAIN CONTENT CLICK HANDLER (Single, consolidated version)
+
+  // ✅ NEW: Enhanced handleContentClick with AI resource generation
   const handleContentClick = async (contentItem) => {
+    console.log("🚀 Start Learning clicked for:", contentItem.title);
+    
     setLoading(true);
     setSelectedTopic(contentItem);
     
     try {
+      // Show loading message
       toast.loading('AI आपके लिए complete study materials generate कर रहा है...', {
         duration: 3000
       });
 
-      // Generate AI resources
+      // Fetch AI-generated resources
       const resources = await fetchAIResources(contentItem);
       
       if (resources) {
         setLearningResources(resources);
         toast.dismiss();
-        
-        // ✅ TRACK USER PROGRESS AUTOMATICALLY
-        await trackUserProgress(contentItem, {
-          status: 'in_progress',
-          completionPercentage: 10,
-          score: 10, // Award XP for starting learning
-          timeSpent: 2,
-          aiResourcesData: {
-            topic: contentItem.title,
-            subject: contentItem.subject,
-            difficulty: contentItem.difficulty,
-            resourcesGenerated: new Date(),
-            isFallback: resources.metadata?.isFallback || false
-          }
-        });
-        
-        // Different messages based on content type
-        if (resources.metadata?.isFallback) {
-          toast.info('📚 Basic study material तैयार है और progress saved! Detailed content के लिए बाद में try करें');
-        } else {
-          toast.success('🎉 Complete AI study package तैयार है और progress saved!');
-        }
+        toast.success('🎉 AI ने complete study package तैयार कर दिया! Videos भी include हैं।');
+      } else {
+        toast.dismiss();
+        toast.error('Resources generate नहीं हो सके। Please try again.');
       }
       
     } catch (error) {
       console.error('Content generation error:', error);
       toast.dismiss();
-      
-      // Show user-friendly error with retry option
-      toast.error(error.message, {
-        duration: 5000,
-        action: {
-          label: 'Retry',
-          onClick: () => handleContentClick(contentItem)
-        }
-      });
-      
+      toast.error('कुछ गलत हुआ। Internet connection check करें।');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter logic
+  // Existing filter logic
   useEffect(() => {
     let filtered = [...sampleContent];
 
@@ -293,7 +215,7 @@ const trackUserProgress = async (contentData, progressData) => {
     }
   };
 
-  // ✅ DETAILED RESOURCE VIEW (When AI resources are generated)
+  // If learning resources are available, show the detailed view
   if (learningResources) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -321,7 +243,7 @@ const trackUserProgress = async (contentData, progressData) => {
                 <div className="flex items-center bg-blue-50 px-3 py-1 rounded-lg">
                   <Award className="h-4 w-4 text-blue-600 mr-1" />
                   <span className="text-blue-600 font-medium text-sm">
-                    {user?.learningStats?.totalXP || user?.progress?.totalXP || 0} XP
+                    {user?.progress?.totalXP || 0} XP
                   </span>
                 </div>
                 <span className="text-sm text-gray-600">{user?.name}</span>
@@ -344,19 +266,14 @@ const trackUserProgress = async (contentData, progressData) => {
                   <h2 className="text-2xl font-bold mb-2 flex items-center">
                     ✨ Complete AI Study Package
                     <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full">
-                      {learningResources.metadata?.difficulty || 'Standard'} Level
+                      {learningResources.metadata?.difficulty} Level
                     </span>
                   </h2>
                   <p className="opacity-90">Topic: {selectedTopic?.title}</p>
                   <p className="text-sm opacity-75">
-                    Time to Master: {learningResources.timeToMaster || '2-3 weeks'} | 
+                    Time to Master: {learningResources.timeToMaster} | 
                     Generated: {new Date().toLocaleString()}
                   </p>
-                  {learningResources.metadata?.isFallback && (
-                    <p className="text-sm bg-yellow-500/20 px-2 py-1 rounded mt-2">
-                      ⚠️ Basic Content Mode - For detailed AI content, try again later
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
@@ -373,6 +290,100 @@ const trackUserProgress = async (contentData, progressData) => {
                     <p className="text-gray-700 leading-relaxed">
                       {learningResources.summary}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* AI-Fetched Video Resources */}
+              {learningResources.videoResources && learningResources.videoResources.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <Play className="h-5 w-5 text-red-600 mr-2" />
+                    🎥 AI-Selected Video Resources
+                    <span className="ml-3 text-sm bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                      {learningResources.videoResources.length} videos curated by AI
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {learningResources.videoResources.map((video, index) => (
+                      <motion.a
+                        key={index}
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        whileHover={{ scale: 1.02 }}
+                        className="block bg-red-50 border border-red-200 rounded-lg overflow-hidden hover:border-red-500 hover:shadow-lg transition-all"
+                      >
+                        {/* Video Thumbnail */}
+                        <div className="relative">
+                          <img 
+                            src={video.thumbnail} 
+                            alt={video.title}
+                            className="w-full h-32 object-cover"
+                            onError={(e) => {
+                              e.target.src = 'https://via.placeholder.com/480x360/ef4444/ffffff?text=Video';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                            <Play className="h-8 w-8 text-white opacity-80" />
+                          </div>
+                          {video.educationalValue && (
+                            <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                              {video.educationalValue}/10
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Video Info */}
+                        <div className="p-4">
+                          <h4 className="font-semibold text-gray-900 line-clamp-2 mb-2 text-sm">
+                            {video.title}
+                          </h4>
+                          
+                          {video.channel && (
+                            <p className="text-xs text-red-600 mb-2">
+                              📺 {video.channel}
+                            </p>
+                          )}
+                          
+                          {video.duration && (
+                            <p className="text-xs text-gray-500 mb-2">
+                              ⏱️ {video.duration}
+                            </p>
+                          )}
+                          
+                          {video.learningOutcomes && (
+                            <p className="text-xs text-gray-600 mb-2">
+                              🎯 {video.learningOutcomes}
+                            </p>
+                          )}
+                          
+                          {video.levelMatch && (
+                            <p className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                              ✓ {video.levelMatch}
+                            </p>
+                          )}
+                        </div>
+                      </motion.a>
+                    ))}
+                  </div>
+                  
+                  {/* AI Search Info */}
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <Brain className="h-5 w-5 text-blue-600 mt-1 mr-3 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-semibold text-blue-800 mb-2">🤖 AI Video Curation Process</h4>
+                        <p className="text-sm text-blue-700 mb-2">
+                          AI automatically searched and analyzed {learningResources.metadata?.totalVideosFound || 'multiple'} videos 
+                          using smart keywords: <strong>{learningResources.metadata?.searchKeywords?.join(', ')}</strong>
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Selected {learningResources.metadata?.videosRecommended} most educational videos based on content relevance, 
+                          difficulty level match, and learning outcomes for {learningResources.metadata?.difficulty} level students.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -479,35 +490,6 @@ const trackUserProgress = async (contentData, progressData) => {
                   </div>
                 </div>
               )}
-
-              {/* Progress Update Button */}
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-green-800 mb-2">📊 Update Your Progress</h4>
-                    <p className="text-sm text-green-700">Mark your learning progress to track improvement</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await trackUserProgress(selectedTopic, {
-                        status: 'completed',
-                        completionPercentage: 100,
-                        score: 25,
-                        timeSpent: 30,
-                        aiResourcesData: {
-                          topic: selectedTopic.title,
-                          completed: true,
-                          completedAt: new Date()
-                        }
-                      });
-                      toast.success('🎉 Progress updated! +25 XP earned!');
-                    }}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                  >
-                    Mark as Complete ✓
-                  </button>
-                </div>
-              </div>
             </div>
           </motion.div>
         </div>
@@ -515,7 +497,7 @@ const trackUserProgress = async (contentData, progressData) => {
     );
   }
 
-  // ✅ DEFAULT VIEW - Learning Content Cards
+  // Default view with course cards
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -539,10 +521,12 @@ const trackUserProgress = async (contentData, progressData) => {
               <div className="flex items-center bg-blue-50 px-3 py-1 rounded-lg">
                 <Award className="h-4 w-4 text-blue-600 mr-1" />
                 <span className="text-blue-600 font-medium text-sm">
-                  {user?.learningStats?.totalXP || user?.progress?.totalXP || 0} XP
+                  {user?.progress?.totalXP || 0} XP
                 </span>
               </div>
-              <span className="text-sm text-gray-600">{user?.name}</span>
+              <span className="text-sm text-gray-600">
+                {user?.name}
+              </span>
               <button
                 onClick={handleLogout}
                 className="flex items-center text-gray-600 hover:text-red-600 transition-colors"
@@ -560,7 +544,7 @@ const trackUserProgress = async (contentData, progressData) => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Learning Center</h1>
           <p className="text-gray-600">
-            Complete study materials with AI-generated content for <span className="font-medium">{user?.grade} - {user?.stream || 'All streams'}</span>
+            Complete study materials with AI-generated videos for <span className="font-medium">{user?.grade} - {user?.stream || 'All streams'}</span>
           </p>
         </div>
 
@@ -669,7 +653,7 @@ const trackUserProgress = async (contentData, progressData) => {
                     <span>0%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '0%' }}></div>
+                    <div className="bg-gray-200 h-2 rounded-full" style={{ width: '0%' }}></div>
                   </div>
                 </div>
 
@@ -690,7 +674,7 @@ const trackUserProgress = async (contentData, progressData) => {
                   ) : (
                     <>
                       <Brain className="h-4 w-4 mr-2" />
-                      Get AI Study Materials + Progress Tracking
+                      Get AI Study Materials + Videos
                     </>
                   )}
                 </button>
