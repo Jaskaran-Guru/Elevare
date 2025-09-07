@@ -1,154 +1,180 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { authAPI } from '../services/api';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+const authReducer = (state, action) => {
+  switch (action.type) {
+    case 'LOGIN_START':
+      return { ...state, loading: true, error: null };
+    case 'LOGIN_SUCCESS':
+      // Initialize progress if not exists
+      const userWithProgress = {
+        ...action.payload.user,
+        progress: action.payload.user.progress || {
+          totalXP: 0,
+          modulesCompleted: 0,
+          currentStreak: 0
+        }
+      };
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(userWithProgress));
+      return {
+        ...state,
+        loading: false,
+        isAuthenticated: true,
+        user: userWithProgress,
+        token: action.payload.token,
+        error: null,
+      };
+    case 'LOGIN_ERROR':
+      return { ...state, loading: false, error: action.payload, isAuthenticated: false };
+    case 'LOGOUT':
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return { ...state, isAuthenticated: false, user: null, token: null };
+    case 'UPDATE_PROGRESS':
+      const updatedUser = {
+        ...state.user,
+        progress: {
+          ...state.user.progress,
+          ...action.payload
+        }
+      };
+      // Save updated user to localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return {
+        ...state,
+        user: updatedUser
+      };
+    default:
+      return state;
   }
-  return context;
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [state, dispatch] = useReducer(authReducer, {
+    isAuthenticated: false,
+    user: null,
+    token: localStorage.getItem('token'),
+    loading: false,
+    error: null,
+  });
 
-  // Check for existing token on app start
+  // Check for existing user data on app load
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      // You can verify token here or decode it
-      // For now, we'll assume valid token means logged in
-      setUser({ token });
+    const userData = localStorage.getItem('user');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        // Initialize progress if not exists
+        if (!parsedUser.progress) {
+          parsedUser.progress = {
+            totalXP: 0,
+            modulesCompleted: 0,
+            currentStreak: 0
+          };
+        }
+        dispatch({ 
+          type: 'LOGIN_SUCCESS', 
+          payload: { user: parsedUser, token } 
+        });
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
     }
   }, []);
 
   const register = async (userData) => {
-    setLoading(true);
+    dispatch({ type: 'LOGIN_START' });
     try {
-      console.log('AuthContext register called with:', userData);
-      
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: userData.name,
-          email: userData.email,
-          password: userData.password,
-          grade: userData.grade,
-          stream: userData.stream || 'science'
-        }),
-      });
-
-      const data = await response.json();
-      console.log('Register API response:', response.status, data);
-
-      if (response.ok) {
-        localStorage.setItem('token', data.token);
-        setUser(data.user);
-        return data;
-      } else {
-        throw new Error(data.message || 'Registration failed');
-      }
+      const response = await authAPI.register(userData);
+      localStorage.setItem('token', response.data.token);
+      dispatch({ type: 'LOGIN_SUCCESS', payload: response.data });
+      return response.data;
     } catch (error) {
-      console.error('Registration error in AuthContext:', error);
+      const errorMessage = error.response?.data?.message || 'Registration failed';
+      dispatch({ type: 'LOGIN_ERROR', payload: errorMessage });
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
-const login = async (credentials) => {
-  setLoading(true);
-  try {
-    console.log('AuthContext login called with:', credentials);
-    
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: credentials.email,
-        password: credentials.password
-      }),
-    });
-
-    console.log('Response status:', response.status);
-    
-    // ✅ Handle different response statuses
-    if (response.status === 404) {
-      throw new Error('Login endpoint not found. Check if backend server is running on port 5000.');
-    }
-    
-    if (response.status === 501) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Login functionality not implemented yet.');
-    }
-    
-    if (!response.ok) {
-      let errorMessage = `Server error: ${response.status} ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-      } catch (parseError) {
-        console.log('Could not parse error response as JSON');
-      }
-      throw new Error(errorMessage);
-    }
-
-    // ✅ Safe JSON parsing
-    const responseText = await response.text();
-    console.log('Response text length:', responseText.length);
-    
-    if (!responseText) {
-      throw new Error('Empty response from server');
-    }
-
-    let data;
+  const login = async (credentials) => {
+    dispatch({ type: 'LOGIN_START' });
     try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Response text was:', responseText);
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+      const response = await authAPI.login(credentials);
+      localStorage.setItem('token', response.data.token);
+      dispatch({ type: 'LOGIN_SUCCESS', payload: response.data });
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Login failed';
+      dispatch({ type: 'LOGIN_ERROR', payload: errorMessage });
+      throw error;
     }
-
-    console.log('Parsed login data:', data);
-
-    if (data.success !== false && data.token) {
-      localStorage.setItem('token', data.token);
-      setUser(data.user);
-      return data;
-    } else {
-      throw new Error(data.message || 'Login failed - no token received');
-    }
-
-  } catch (error) {
-    console.error('Login error in AuthContext:', error);
-    throw error;
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+    dispatch({ type: 'LOGOUT' });
+  };
+
+  // ✅ NEW: Update user progress function
+  const updateProgress = (progressData) => {
+    dispatch({ type: 'UPDATE_PROGRESS', payload: progressData });
+  };
+
+  // ✅ NEW: Earn XP function
+  const earnXP = (xpAmount, moduleName = '') => {
+    if (!state.user) {
+      console.warn('Cannot earn XP: User not logged in');
+      return;
+    }
+
+    const currentProgress = state.user.progress || { totalXP: 0, modulesCompleted: 0, currentStreak: 0 };
+    
+    const newProgress = {
+      totalXP: currentProgress.totalXP + xpAmount,
+      modulesCompleted: currentProgress.modulesCompleted + 1,
+      currentStreak: currentProgress.currentStreak + 1
+    };
+
+    updateProgress(newProgress);
+
+    console.log(`🏆 Earned ${xpAmount} XP! Total: ${newProgress.totalXP} XP`);
+    
+    // Optional: Show level up notification
+    const currentLevel = Math.floor(currentProgress.totalXP / 100) + 1;
+    const newLevel = Math.floor(newProgress.totalXP / 100) + 1;
+    
+    if (newLevel > currentLevel) {
+      console.log(`🎉 LEVEL UP! You are now Level ${newLevel}!`);
+    }
+  };
+
+  // ✅ NEW: Get user level function
+  const getUserLevel = () => {
+    if (!state.user?.progress?.totalXP) return 1;
+    return Math.floor(state.user.progress.totalXP / 100) + 1;
+  };
+
+  // ✅ NEW: Get XP progress in current level
+  const getLevelProgress = () => {
+    if (!state.user?.progress?.totalXP) return 0;
+    return state.user.progress.totalXP % 100;
   };
 
   const value = {
-    user,
-    loading,
+    ...state,
     register,
     login,
     logout,
-    isAuthenticated: !!user
+    updateProgress,
+    earnXP,
+    getUserLevel,
+    getLevelProgress
   };
 
   return (
@@ -156,4 +182,12 @@ const login = async (credentials) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
 };

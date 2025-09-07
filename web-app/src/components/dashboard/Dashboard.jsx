@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, BookOpen, Target, Award, TrendingUp, Trophy, Star, BarChart, Brain } from 'lucide-react'; // ✅ ADD Brain icon
+import { LogOut, BookOpen, Target, Award, TrendingUp, Trophy, Star, BarChart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import Quiz from '../quiz/Quiz';
 import toast from 'react-hot-toast';
-import NotificationBell from '../notifications/NotificationBell';
+import NotificationBell from '../notifications/NotificationBell'; // ✅ ADD THIS
 
 const Dashboard = () => {
   const { user, logout, earnXP } = useAuth();
@@ -65,7 +65,7 @@ const Dashboard = () => {
               </h1>
               <span className="ml-3 text-gray-600">Dashboard</span>
               
-              {/* ✅ ENHANCED Navigation Menu with AI Syllabus */}
+              {/* Navigation Menu */}
               <div className="ml-8 flex space-x-4">
                 <Link to="/learning" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
                   Learning
@@ -73,7 +73,6 @@ const Dashboard = () => {
                 <Link to="/analytics" className="text-gray-600 hover:text-green-600 transition-colors font-medium">
                   Analytics
                 </Link>
-               
               </div>
             </div>
             
@@ -183,8 +182,6 @@ const Dashboard = () => {
             ))}
           </div>
 
-      
-
           {/* Quick Quiz Section */}
           <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
@@ -222,7 +219,7 @@ const Dashboard = () => {
               Getting Started
             </h2>
             <div className="space-y-4">
-              {/* Step 1 */}
+              {/* ✅ FIXED: Step 1 */}
               <div className="flex items-center p-4 bg-blue-50 rounded-lg border border-blue-100">
                 <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
                   1
@@ -234,7 +231,7 @@ const Dashboard = () => {
                 <div className="text-blue-500 text-sm font-medium">+5 XP</div>
               </div>
               
-              {/* Step 2 */}
+              {/* ✅ FIXED: Step 2 */}
               <div className="flex items-center p-4 bg-green-50 rounded-lg border border-green-100">
                 <div className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
                   2
@@ -246,7 +243,7 @@ const Dashboard = () => {
                 <div className="text-green-500 text-sm font-medium">+10 XP</div>
               </div>
               
-              {/* Step 3 */}
+              {/* ✅ FIXED: Step 3 */}
               <div className="flex items-center p-4 bg-purple-50 rounded-lg border border-purple-100">
                 <div className="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
                   3
@@ -258,7 +255,7 @@ const Dashboard = () => {
                 <div className="text-purple-500 text-sm font-medium">+15 XP per course</div>
               </div>
 
-              {/* Step 4 - Analytics */}
+              {/* ✅ FIXED: Step 4 - Analytics */}
               <div className="flex items-center p-4 bg-orange-50 rounded-lg border border-orange-100">
                 <div className="w-10 h-10 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-lg">
                   4
@@ -277,27 +274,20 @@ const Dashboard = () => {
                   </Link>
                 </div>
               </div>
-
-              
-           
             </div>
           </div>
 
           {/* Start Learning Button */}
           <div className="text-center mb-8">
-            <div className="space-x-4">
-              <Link 
-                to="/learning"
-                className="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-4 rounded-xl text-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-              >
-                <BookOpen className="h-7 w-7 mr-3" />
-                Start Learning Journey
-                <Award className="h-5 w-5 ml-2" />
-              </Link>
-              
-             
-            </div>
-            <p className="text-gray-500 text-sm mt-2">Choose traditional learning or try our AI-powered study materials!</p>
+            <Link 
+              to="/learning"
+              className="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-4 rounded-xl text-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              <BookOpen className="h-7 w-7 mr-3" />
+              Start Learning Journey
+              <Award className="h-5 w-5 ml-2" />
+            </Link>
+            <p className="text-gray-500 text-sm mt-2">Earn XP for every completed course!</p>
           </div>
 
           {/* Achievement Preview */}

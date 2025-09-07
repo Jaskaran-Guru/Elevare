@@ -11,7 +11,7 @@ const Login = () => {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const { login, loading } = useAuth();
+  const { login, loading, error } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -23,17 +23,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    
     try {
       await login(formData);
-      toast.success('Login successful!');
+      toast.success('Login successful! Welcome to Elevare!');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.message || 'Login failed');
+      toast.error(error.response?.data?.message || 'Login failed');
     }
   };
 
@@ -50,7 +45,7 @@ const Login = () => {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Elevare
           </h1>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Welcome Back</h2>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">Welcome back!</h2>
           <p className="mt-2 text-sm text-gray-600">
             Sign in to continue your learning journey
           </p>
@@ -111,13 +106,20 @@ const Login = () => {
             </div>
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
             className="btn-primary w-full disabled:opacity-50"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
 
           {/* Register Link */}
@@ -125,7 +127,7 @@ const Login = () => {
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
-                Register here
+                Sign up here
               </Link>
             </p>
           </div>
